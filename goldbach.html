@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Goldbach Calculator — Prime Equation</title>
+  <meta name="description" content="Find a Goldbach pair for a large even E by scanning a short centered window around E/2, using strong probable-prime tests.">
+  <style>
+    :root{--bg:#0f0e17;--fg:#fffffe;--muted:#a7a9be;--accent:#7c3aed;--accent-2:#10b981;--card:#16151f;--card-2:#131225;--shadow:0 10px 30px rgba(0,0,0,.35);--radius:16px}
+    *{box-sizing:border-box} html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:Inter,ui-sans-serif,system-ui}
+    a{color:#a78bfa;text-decoration:none} a:hover{color:#34d399}
+    header{max-width:1100px;margin:0 auto;padding:28px 20px;display:flex;gap:14px;align-items:center;justify-content:space-between}
+    .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:var(--shadow);margin-right:8px;display:inline-block;vertical-align:middle}
+    h1{font-size:1.2rem;margin:0}
+    .wrap{max-width:900px;margin:12px auto 40px;padding:0 20px}
+    .card{background:linear-gradient(180deg,var(--card),var(--card-2));border:1px solid rgba(255,255,255,.06);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+    label{display:block;margin:.6rem 0 .3rem;color:var(--muted)}
+    input,button{width:100%;padding:12px 14px;margin:.2rem 0 .6rem;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:#12111a;color:var(--fg)}
+    button{cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent-2));border:none;font-weight:600}
+    .row{display:grid;gap:14px} @media(min-width:780px){.row{grid-template-columns:1fr 1fr}}
+    pre{white-space:pre-wrap;word-wrap:break-word;background:#0d0c14;border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,.06)}
+    footer{max-width:900px;margin:30px auto;padding:0 20px;color:var(--muted);text-align:center}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <span class="logo" aria-hidden="true"></span>
+      <h1 style="display:inline-block;vertical-align:middle">Goldbach Calculator</h1>
+    </div>
+    <nav><a href="index.html">Home</a> · <a href="prime.html">Prime</a> · <a href="paper.html">Paper</a> · <a href="about.html">About</a></nav>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <p>Enter a large <strong>even</strong> number E (digits only). The tool scans outward from x = E/2 to find a Goldbach pair (p, q) = (x − t, x + t) using strong probable-prime tests.</p>
+      <div class="row">
+        <div>
+          <label for="E">E (even integer)</label>
+          <input id="E" placeholder="e.g. 100000000000000000000000000000000000"/>
+        </div>
+        <div>
+          <label for="T">Window radius (max |t|)</label>
+          <input id="T" placeholder="e.g. 50000" value="50000"/>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="rounds">Miller–Rabin rounds</label>
+          <input id="rounds" value="16"/>
+        </div>
+        <div>
+          <label for="cap">Max attempts</label>
+          <input id="cap" value="200000"/>
+        </div>
+      </div>
+      <button id="run">Find Goldbach Pair</button>
+      <pre id="out" aria-live="polite"></pre>
+    </section>
+  </main>
+
+  <footer>© <span id="yr"></span> Bahbouhi Bouchaib (Renom)</footer>
+
+  <script>
+    (function(){
+      const out = document.getElementById('out');
+      const yr = document.getElementById('yr'); yr.textContent = new Date().getFullYear();
+
+      function toBigInt(txt){
+        const s = (txt||"").trim().replace(/[_\s]/g,'');
+        if(!/^\d+$/.test(s)) throw new Error("E must contain digits only.");
+        return BigInt(s);
+      }
+      function modPow(a, e, m){
+        let r=1n;a%=m;
+        while(e>0n){ if(e&1n) r=(r*a)%m; a=(a*a)%m; e>>=1n; }
+        return r;
+      }
+      function isProbablePrime(n, k){
+        if(n<2n) return false;
+        const small=[2n,3n,5n,7n,11n,13n,17n,19n,23n,29n,31n,37n];
+        for(const p of small){ if(n===p) return true; if(n%p===0n) return n===p; }
+        let d=n-1n,s=0n; while((d&1n)===0n){ d>>=1n; s++; }
+        function trial(a){
+          let x=modPow(a,d,n);
+          if(x===1n||x===n-1n) return true;
+          for(let r=1n;r<s;r++){ x=(x*x)%n; if(x===n-1n) return true; }
+          return false;
+        }
+        const bases=[2n,325n,9375n,28178n,450775n,9780504n,1795265022n];
+        for(const b of bases){ if(b%(n-2n)+2n===n) continue; if(!trial(b)) return false; }
+        for(let i=0;i<k;i++){
+          const a = 2n + BigInt(Math.floor(Math.random()*1e9))%(n-3n);
+          if(!trial(a)) return false;
+        }
+        return true;
+      }
+
+      document.getElementById('run').addEventListener('click', () => {
+        try{
+          const E = toBigInt(document.getElementById('E').value);
+          if(E%2n!==0n) throw new Error("E must be even.");
+          let T = parseInt(document.getElementById('T').value||'0',10);
+          const rounds = parseInt(document.getElementById('rounds').value||'16',10);
+          const cap = parseInt(document.getElementById('cap').value||'200000',10);
+          if(!(T>0)) T=50000;
+          const x = E/2n;
+          out.textContent = "Scanning around x = E/2...\n";
+          let attempts=0;
+          for(let t=0;t<=T;t++){
+            if(attempts>cap){ out.textContent += "Reached max attempts. Increase window or cap.\n"; return; }
+            const a = x - BigInt(t);
+            const b = x + BigInt(t);
+            attempts++;
+            if(t===0){
+              if(isProbablePrime(a,rounds) && isProbablePrime(b,rounds)){
+                out.textContent += `Found at t=0: p=${a} q=${b}\n`; return;
+              }
+            }else{
+              if(isProbablePrime(a,rounds) && isProbablePrime(b,rounds)){
+                out.textContent += `Found at t=${t}: p=${a} q=${b}\n`; return;
+              }
+            }
+          }
+          out.textContent += `No pair within |t| ≤ ${T}. Try increasing the window.\n`;
+        }catch(err){
+          out.textContent = "Error: "+err.message;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
